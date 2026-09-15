@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: devops-controller-sa
+  namespace: devops-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: devops-controller-role
+rules:
+- apiGroups: [""]
+  resources: ["pods", "pods/log", "pods/exec", "pods/status"]
+  verbs: ["create", "get", "list", "watch", "delete", "patch"]
+- apiGroups: ["devops.local"]
+  resources: ["tasks", "tasks/status"]
+  verbs: ["get", "list", "watch", "update", "patch"]
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["create", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: devops-controller-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: devops-controller-role
+subjects:
+- kind: ServiceAccount
+  name: devops-controller-sa
+  namespace: devops-system

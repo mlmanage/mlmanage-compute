@@ -1,0 +1,62 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: reservations.devops.local
+spec:
+  group: devops.local
+  names:
+    kind: Reservation
+    plural: reservations
+    singular: reservation
+  scope: Namespaced
+  versions:
+  - name: v1
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        required: ["spec"]
+        properties:
+          spec:
+            type: object
+            required: ["userId", "gpuUUID", "startTime", "endTime"]
+            properties:
+              userId:
+                type: string
+                description: "User ID who owns the reservation"
+              gpuUUID:
+                type: string
+                description: "UUID of the GPU being reserved"
+              startTime:
+                type: string
+                format: date-time
+                description: "Start time of the reservation"
+              endTime:
+                type: string
+                format: date-time
+                description: "End time of the reservation"
+              priority:
+                type: integer
+                default: 0
+                description: "Priority level for preemption (higher wins)"
+              gpuPartition:
+                type: string
+                nullable: true
+                description: "MIG slice profile (e.g., '1g.5gb'); empty = full card / time-slice"
+              sliceIndex:
+                type: integer
+                nullable: true
+                description: "Index of slice instance on this GPU (0..N-1)"
+          status:
+            type: object
+            properties:
+              status:
+                type: string
+                description: "Reservation status (e.g., 'active', 'preempted', 'expired')"
+              notifiedStart:
+                type: boolean
+                description: "Whether notification was sent about upcoming start"
+              notifiedEnd:
+                type: boolean
+                description: "Whether notification was sent about upcoming end"

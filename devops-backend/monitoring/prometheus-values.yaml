@@ -1,0 +1,33 @@
+# monitoring/prometheus-values.yaml
+prometheus:
+  prometheusSpec:
+    serviceMonitorSelectorNilUsesHelmValues: false
+    additionalScrapeConfigs: []
+    ruleSelectorNilUsesHelmValues: false
+    alertmanagerSpec:
+      alertmanagerConfigSelector: {}
+
+grafana:
+  # Wyłącz automatyczne tworzenie dashboardów
+  defaultDashboardsEnabled: false
+  # Sidecar datasources MUSI być włączony: kube-prometheus-stack renderuje ConfigMap
+  # `monitoring-kube-prometheus-grafana-datasource` (label grafana_datasource=1) i czyta ją
+  # WYŁĄCZNIE ten sidecar, montując do /etc/grafana/provisioning/datasources/.
+  # Wyłączenie go = Grafana bez żadnego źródła danych i puste panele.
+  sidecar:
+    datasources:
+      enabled: true
+      # Chart sam tworzy źródło `Prometheus` (uid: prometheus, isDefault: true) z poprawnym
+      # URL-em usługi tego release (monitoring-kube-prometheus-prometheus:9090), więc NIE
+      # dopisujemy go ręcznie przez additionalDataSources – duplikat nazwy/uid + dwa
+      # isDefault psują provisioning.
+      defaultDatasourceEnabled: true
+      isDefaultDatasource: true
+  # UWAGA: nie definiujemy tu `dashboardProviders` typu `file`. Taki dostawca wymaga
+  # katalogu zamontowanego w podzie (np. przez `dashboardsConfigMaps`); bez tego Grafana
+  # przy każdym starcie loguje błąd:
+  #   provisioning.dashboard type=file name=gpu-dashboards level=error
+  #   msg="Cannot read directory" error="stat /var/lib/grafana/dashboards: no such file..."
+  # Dashboardy wgrywa sidecar `grafana-sc-dashboard` (włączony domyślnie w chart, szuka
+  # ConfigMap z labelką grafana_dashboard=1 i zapisuje pliki do /tmp/dashboards) – tak
+  # trafia do Grafany `monitoring/gpu-dashboard.json` tworzony przez deploy-all.sh.

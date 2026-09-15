@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: custom-mig-parted-config
+  namespace: gpu-operator
+data:
+  config.yaml: |
+    version: v1
+    mig-configs:
+      # Domyślny stan: MIG wyłączony na wszystkich kartach (bezpieczny start).
+      all-disabled:
+      - devices: all
+        mig-enabled: false
+      # Wpis nadpisywany w czasie działania przez API (POST /gpu/{uuid}/partition mode=mig).
+      # API wygeneruje tu osobny element per-GPU z różną geometrią MIG.
+      mlmanage:
+      - devices: all
+        mig-enabled: false

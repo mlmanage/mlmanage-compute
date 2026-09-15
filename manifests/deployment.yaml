@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ubuntu
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ubuntu
+  template:
+    metadata:
+      labels:
+        app: ubuntu
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: ubuntu
+        image: prodimage:1
+        command: ["/bin/sh", "-c", "sleep infinity"]
+        imagePullPolicy: Never  
+        ports:
+        - containerPort: 22
+        volumeMounts:
+        - name: data
+          mountPath: /home/developer
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "2"      
+#        readinessProbe:
+#          tcpSocket:
+#            port: 22
+#          initialDelaySeconds: 10
+#          periodSeconds: 5
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: dev-disk

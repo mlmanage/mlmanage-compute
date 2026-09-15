@@ -1,0 +1,87 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: tasks.devops.local
+spec:
+  group: devops.local
+  names:
+    kind: Task
+    plural: tasks
+    singular: task
+  scope: Namespaced
+  versions:
+  - name: v1
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        required: ["spec"]
+        properties:
+          spec:
+            type: object
+            required: ["user", "image"]
+            properties:
+              user:
+                type: string
+              project:
+                type: string
+              image:
+                type: string
+              command:
+                type: array
+                items:
+                  type: string
+              resources:
+                type: object
+                properties:
+                  limits:
+                    type: object
+                    properties:
+                      cpu:
+                        type: string
+                      memory:
+                        type: string
+                      nvidia.com/gpu:
+                        type: integer
+                        minimum: 0
+                  requests:
+                    type: object
+              timeLimitSeconds:
+                type: integer
+                minimum: 0
+              gpuUUID:
+                type: string
+              vramLimitGB:
+                type: integer
+                minimum: 0
+              migProfile:
+                type: string
+              gpuType:
+                type: string
+              jobGroup:
+                type: string
+              env:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+                    value:
+                      type: string
+          status:
+            type: object
+            properties:
+              phase:
+                type: string
+              startTime:
+                type: string
+                format: date-time
+              completionTime:
+                type: string
+                format: date-time
+              podName:
+                type: string
+              reason:
+                type: string

@@ -1,0 +1,145 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: devops-api
+  namespace: devops-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: devops-api
+  template:
+    metadata:
+      labels:
+        app: devops-api
+    spec:
+      serviceAccountName: api-sa
+      containers:
+      - name: api
+        # Obraz z zaszytymi zależnościami + crane (devops-backend/api/Dockerfile),
+        # zbudowany lokalnie do demona docker minikube. Start = sekundy zamiast
+        # minut, bez pip install z internetu przy każdym starcie — to usuwa
+        # CrashLoopBackOff przy wolnej/zawodnej sieci i restartach węzła.
+        # imagePullPolicy: IfNotPresent => używa lokalnie zbudowanego obrazu,
+        # nie próbuje go ściągać z Docker Hub.
+        # Fallback (jeśli obraz lokalny nie istnieje): patrz scripts/build-api-image.sh
+        image: devops-api:local
+        imagePullPolicy: IfNotPresent
+        workingDir: /app
+        # main.py montowane z ConfigMap api-script w /app; CMD obrazu uruchamia uvicorn.
+        volumeMounts:
+        - name: api-script
+          mountPath: /app
+        env:
+        - name: DATABASE_URL
+          value: "postgresql://postgres:postgres@postgres/devops"
+        - name: SECRET_KEY
+          value: "supersecretkey"
+        ports:
+        - containerPort: 8000
+        # Deps are baked into the image, so uvicorn listens within seconds; the
+        # only startup delay now is the DB connection. Readiness gates the
+        # Service + `kubectl rollout status` so nothing talks to the API (or
+        # port-forwards into it) before /health actually answers — without it
+        # rollout reported "ready" while the app was still booting and the test
+        # suite's port-forward hit "connection refused". The startup probe still
+        # tolerates a slow DB (up to ~2 min) before liveness kicks in.
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          periodSeconds: 5
+          failureThreshold: 24
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          periodSeconds: 20
+          timeoutSeconds: 3
+          failureThreshold: 5
+      volumes:
+      - name: api-script
+        configMap:
+          name: api-script
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: devops-api
+  namespace: devops-system
+spec:
+  selector:
+    app: devops-api
+  ports:
+  - port: 8000
+    targetPort: 8000
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: api-sa
+  namespace: devops-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: api-role
+rules:
+- apiGroups: [""]
+  resources: ["namespaces"]
+  verbs: ["create", "get", "list"]
+- apiGroups: ["devops.local"]
+  resources: ["tasks"]
+  verbs: ["create", "get", "list", "delete"]
+- apiGroups: [""]
+  resources: ["nodes"]
+  verbs: ["get", "list", "patch"]
+# GPU partitioning: API zarządza ConfigMap device-plugina (time-slicing) w gpu-operator.
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["get", "list", "create", "update", "patch"]
+# Workspace provisioning requires PVC access in each user namespace.
+- apiGroups: [""]
+  resources: ["persistentvolumeclaims"]
+  # delete: migracja startowa odtwarza PVC, które wiszą w Pending na nieistniejącej klasie
+  # storage (storageClassName jest niezmienny, więc naprawa = usuń i utwórz ponownie).
+  verbs: ["create", "get", "list", "delete"]
+# Diagnostyka storage przy starcie: sprawdzamy, czy klasa z WORKSPACE_STORAGE_CLASS istnieje
+# (lub czy klaster ma klasę domyślną). Bez tego zła klasa = PVC na zawsze Pending = brak
+# podów zadań i brak odczytu wyników, w całkowitej ciszy.
+- apiGroups: ["storage.k8s.io"]
+  resources: ["storageclasses"]
+  verbs: ["get", "list"]
+# The GPU metrics collector reads task Pods, the cleanup reaper deletes expired Pods,
+# and the API creates helper Pods for result downloads.
+- apiGroups: [""]
+  resources: ["pods"]
+  # patch: reaper stempluje adnotację last-used na podzie results-helper (idle reaping).
+  verbs: ["get", "list", "delete", "create", "patch"]
+# Łączenie z podem: logi i interaktywny exec.
+- apiGroups: [""]
+  resources: ["pods/log"]
+  verbs: ["get"]
+- apiGroups: [""]
+  resources: ["pods/exec"]
+  verbs: ["create", "get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: api-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: api-role
+subjects:
+- kind: ServiceAccount
+  name: api-sa
+  namespace: devops-system

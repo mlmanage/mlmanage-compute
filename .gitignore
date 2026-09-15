@@ -1,0 +1,12 @@
+devops-backend/scripts/minikube-linux-amd64
+kubectl
+minikube-linux-amd64
+__pycache__/
+*.py[cod]
+.venv-focused/
+logs.txt
+devops-backend/scripts/ca.*
+devops-backend/scripts/webhook.crt
+devops-backend/scripts/webhook.csr
+devops-backend/scripts/webhook.key
+devops-backend/scripts/webhook.conf

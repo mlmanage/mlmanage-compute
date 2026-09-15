@@ -1,0 +1,82 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: devops-controller
+  namespace: devops-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: devops-controller
+  template:
+    metadata:
+      labels:
+        app: devops-controller
+    spec:
+      serviceAccountName: devops-controller-sa
+      containers:
+      - name: controller
+        # Obraz z zaszytymi zależnościami (devops-backend/controllers/Dockerfile),
+        # zbudowany lokalnie do demona docker minikube przez build-controller-image.sh.
+        # Start = sekundy zamiast pip-install z internetu przy każdym starcie — to
+        # usuwa CrashLoopBackOff przy wolnej sieci / restartach węzła (przez co pody
+        # zadań nie powstawały na czas i testy VRAM / per-typ GPU potrafiły failować).
+        image: devops-controller:local
+        imagePullPolicy: IfNotPresent
+        volumeMounts:
+        - name: script
+          mountPath: /app
+        ports:
+        - containerPort: 8080
+        # Kopf wystawia wbudowany endpoint liveness (--liveness w CMD obrazu).
+        # python:3.10-slim nie ma pgrep/ps, więc używamy httpGet, nie exec.
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 20
+          periodSeconds: 20
+          failureThreshold: 5
+      volumes:
+      - name: script
+        configMap:
+          name: controller-scripts
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: devops-controller-sa
+  namespace: devops-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: devops-controller-role
+rules:
+- apiGroups: [""]
+  resources: ["pods", "pods/log", "pods/exec"]
+  verbs: ["create", "get", "list", "watch", "delete"]
+- apiGroups: ["devops.local"]
+  resources: ["tasks", "tasks/status"]
+  verbs: ["get", "list", "watch", "update", "patch"]
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["create", "patch"]
+# Kopf przy starcie listuje CRD (peering/scanning); bez tego sypie APIForbiddenError
+# i ponawia w kółko (szum w logach, wolniejszy start).
+- apiGroups: ["apiextensions.k8s.io"]
+  resources: ["customresourcedefinitions"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: devops-controller-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: devops-controller-role
+subjects:
+- kind: ServiceAccount
+  name: devops-controller-sa
+  namespace: devops-system

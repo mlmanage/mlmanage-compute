@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: time-slicing-config
+  namespace: gpu-operator
+# Profile device-plugina NVIDIA. Ta ConfigMapa jest edytowana w czasie działania przez API
+# (POST /gpu/{uuid}/partition -> apply_device_sharing), które dopisuje klucz `mlm-<node>`
+# z podziałem PER KARTA i etykietuje węzeł `nvidia.com/device-plugin.config=mlm-<node>`.
+#
+# The `default` profile has no `sharing` section, so each GPU is published as one whole device.
+# Per-GPU sharing is enabled explicitly through the partition API.
+data:
+  default: |
+    version: v1

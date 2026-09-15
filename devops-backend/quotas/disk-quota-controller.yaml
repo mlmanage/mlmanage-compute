@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: disk-quota-controller
+  namespace: devops-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: disk-quota-controller
+  template:
+    metadata:
+      labels:
+        app: disk-quota-controller
+    spec:
+      serviceAccountName: disk-quota-sa
+      containers:
+      - name: controller
+        image: python:3.10-slim
+        command: ["sh", "-c"]
+        args:
+          - pip install kubernetes prometheus-client requests && python /app/disk-quota-controller.py
+        volumeMounts:
+        - name: script
+          mountPath: /app
+      volumes:
+      - name: script
+        configMap:
+          name: disk-quota-script

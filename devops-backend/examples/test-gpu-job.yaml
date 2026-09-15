@@ -1,0 +1,17 @@
+apiVersion: devops.local/v1
+kind: Task
+metadata:
+  name: gpu-test
+  namespace: user-testuser  # zmień na właściwy namespace użytkownika
+spec:
+  user: testuser
+  project: test-project
+  image: nvidia/cuda:11.0-base
+  command: ["nvidia-smi"]
+  resources:
+    limits:
+      nvidia.com/gpu: 1
+      memory: "4Gi"
+      cpu: "2"
+  timeLimitSeconds: 3600
+  vramLimitGB: 4

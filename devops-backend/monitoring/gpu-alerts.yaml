@@ -1,0 +1,24 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: gpu-alerts
+  namespace: monitoring
+spec:
+  groups:
+  - name: gpu
+    rules:
+    - alert: GPUHighTemperature
+      expr: DCGM_FI_DEV_GPU_TEMP > 85
+      for: 5m
+      annotations:
+        summary: "GPU {{ $labels.gpu }} temperature high ({{ $value }}°C)"
+    - alert: GPUHighPower
+      expr: DCGM_FI_DEV_POWER_USAGE > 250
+      for: 5m
+      annotations:
+        summary: "GPU {{ $labels.gpu }} power high ({{ $value }}W)"
+    - alert: GPUOOM
+      expr: DCGM_FI_DEV_FB_FREE < 100
+      for: 1m
+      annotations:
+        summary: "GPU {{ $labels.gpu }} low free memory ({{ $value }}MiB)"

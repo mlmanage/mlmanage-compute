@@ -1,0 +1,25 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: reservation-reminder
+  namespace: devops-system
+spec:
+  schedule: "0 8 * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: reminder
+            image: curlimages/curl:latest
+            command:
+              - /bin/sh
+              - -c
+              - |
+                API_URL="http://devops-api.devops-system.svc:8000"
+                echo "Checking expiring reservations..."
+                curl -s "$API_URL/reservations/calendar" | jq -c '.[]' | while read res; do
+                  # Proste przypomnienie – w praktyce wysyłka email/webhook
+                  echo "Reminder: Reservation $res"
+                done
+          restartPolicy: OnFailure

@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vram-webhook
+  namespace: devops-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vram-webhook
+  template:
+    metadata:
+      labels:
+        app: vram-webhook
+    spec:
+      containers:
+      - name: webhook
+        image: python:3.10-slim
+        command: ["python", "/app/webhook.py"]
+        volumeMounts:
+        - name: script
+          mountPath: /app
+        - name: certs
+          mountPath: /etc/webhook/certs
+        env:
+        - name: LOG_LEVEL
+          value: INFO
+        ports:
+        - containerPort: 8443
+        # Sonda TCP na porcie TLS — pewność, że webhook faktycznie nasłuchuje, zanim
+        # MutatingWebhookConfiguration zacznie do niego kierować admission-review.
+        readinessProbe:
+          tcpSocket:
+            port: 8443
+          initialDelaySeconds: 3
+          periodSeconds: 10
+        livenessProbe:
+          tcpSocket:
+            port: 8443
+          initialDelaySeconds: 10
+          periodSeconds: 20
+          failureThreshold: 5
+      volumes:
+      - name: script
+        configMap:
+          name: vram-webhook-script
+      - name: certs
+        secret:
+          secretName: vram-webhook-tls
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vram-webhook
+  namespace: devops-system
+spec:
+  selector:
+    app: vram-webhook
+  ports:
+  - port: 443
+    targetPort: 8443
